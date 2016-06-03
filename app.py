@@ -16,9 +16,11 @@ from bokeh.resources import INLINE
 from bokeh.templates import JS_RESOURCES, CSS_RESOURCES
 from bokeh.util.string import encode_utf8
 
-import pandas as pd
-from bokeh.charts import TimeSeries, output_file, vplot
 
+from bokeh.charts import TimeSeries, output_file, vplot
+YOURAPIKEY="WQxVvsi1gEbN8yfbQxUH"
+import pandas
+import requests
 app = Flask(__name__)
 
 colors = {
@@ -53,19 +55,19 @@ def graphstocks(ssymbol):
     _from = int(getitem(args, '_from', 0))
     to = int(getitem(args, 'to', 10))
 
-    # Create a polynomial line graph
-    #x = list(range(_from, to + 1))
-    #fig = figure(title="Polynomial")
-    #fig.line(x, [i ** 2 for i in x], color=color, line_width=2)
-    AAPL= pd.read_csv("https://ichart.yahoo.com/table.csv?s="+ssymbol+"&a=0&b=1&c=2000&d=0&e=1&f=2010",parse_dates=['Date'])   
-    data = dict(AAPL=AAPL['Adj Close'], Date=AAPL['Date'])
-    tsline = TimeSeries(data,x='Date', y='AAPL', ylabel='Stock Prices', legend=True)
-    #tsline=TimeSeries(data,x='Date', y=['AAPL'], color=['AAPL'], dash=['AAPL'],
-   #                   title="Timeseries", ylabel = 'Stock Prices', legend=True)
-#    tspoint=TimeSeries(data,x='Date',y=[ssymbol], dash=[ssymbol],title="Timeseries",ylabel='Stock Prices', legend=True)
-    output_file("timeseries.html")
-    fig=vplot(tsline)
     
+    stock = ssymbol
+    api_url='https://www.quandl.com/api/v3/datasets/WIKI/%(symbol)s.json?api_key=%(key)s' % {"symbol":stock, "key":YOURAPIKEY}
+    session = requests.Session()
+    session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
+    raw_data=session.get(api_url)
+    aapl_stock=raw_data.json()
+
+    cnames = aapl_stock['dataset']['column_names']
+    df = pandas.DataFrame(aapl_stock['dataset']['data'],columns=cnames) # create dataframe and assign column names
+    df['Date']=pandas.to_datetime(df['Date']) # convert Date column to DateTime in place
+    tsline = TimeSeries(df,x='Date', y='Close', ylabel=ssymbol+' Stock Prices', legend=True, color=color)
+    fig=vplot(tsline)
     # Configure resources to include BokehJS inline in the document.
     # For more details see:
     #   http://bokeh.pydata.org/en/latest/docs/reference/resources_embedding.html#bokeh-embed
@@ -97,7 +99,8 @@ def graphstocks(ssymbol):
         css_resources=css_resources,
         color=color,
         _from=_from,
-        to=to
+        to=to,
+        symbol_lulu=ssymbol
     )
     return encode_utf8(html)
 
@@ -114,8 +117,9 @@ def butpush():
 
 
 def main():
-    #app.debug = True
-    app.run(port=33507)
+    app.debug = True
+    app.run()
+    #app.run(port=33507)   #before putting on heroku, take away debug and use port 33507
     #print "HI""hi"
 
 if __name__ == "__main__":
