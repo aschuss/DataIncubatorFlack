@@ -111,7 +111,8 @@ def butpush():
         ssymbol=request.form['symbol_lulu']
         sdate = request.form['_from']
         edate = request.form['to']
-        color = request.form['color']
+        #color = request.form['color']
+        color = "Black"
         try: 
             sdate = parse(sdate).strftime("%Y-%m-%d")
             edate = parse(edate).strftime("%Y-%m-%d")
