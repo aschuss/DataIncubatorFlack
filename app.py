@@ -15,7 +15,10 @@ from bokeh.embed import components
 from bokeh.resources import INLINE
 from bokeh.templates import JS_RESOURCES, CSS_RESOURCES
 from bokeh.util.string import encode_utf8
-
+from dateutil.parser import parse
+import dateutil.relativedelta
+ #, relativedelta
+from datetime import datetime, date
 
 from bokeh.charts import TimeSeries, output_file, vplot
 YOURAPIKEY="WQxVvsi1gEbN8yfbQxUH"
@@ -40,33 +43,26 @@ def getitem(obj, item, default):
 
 @app.route("/")
 def nowbegin():
-    return graphstocks("AAPL")
-    
-
-def graphstocks(ssymbol):
-    """ Very simple embedding of a polynomial chart"""
-    # Grab the inputs arguments from the URL
-    # This is automated by the button
-    args = ["ADAM"] 
-    args = request.args
-
-    # Get all the form arguments in the url with defaults
-    color = colors[getitem(args, 'color', 'Black')]
-    _from = int(getitem(args, '_from', 0))
-    to = int(getitem(args, 'to', 10))
+    edate = date.today().strftime("%Y-%m-%d")
+    sdate = date.today()-dateutil.relativedelta.relativedelta(months=1)
+    return(graphstocks("AAPL",sdate,edate,"Black"))
 
     
+
+def graphstocks(ssymbol, sdate, edate,color):
     stock = ssymbol
-    api_url='https://www.quandl.com/api/v3/datasets/WIKI/%(symbol)s.json?api_key=%(key)s' % {"symbol":stock, "key":YOURAPIKEY}
+    if color not in colors:
+        color="Black"
+    api_url='https://www.quandl.com/api/v3/datasets/WIKI/%(symbol)s.json?api_key=%(key)s&start_date=%(sdate)s&end_date=%(edate)s' % {"symbol":stock, "key":YOURAPIKEY,"sdate":sdate, "edate":edate}
     session = requests.Session()
     session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
     raw_data=session.get(api_url)
     aapl_stock=raw_data.json()
-
+    color="Black"
     cnames = aapl_stock['dataset']['column_names']
     df = pandas.DataFrame(aapl_stock['dataset']['data'],columns=cnames) # create dataframe and assign column names
     df['Date']=pandas.to_datetime(df['Date']) # convert Date column to DateTime in place
-    tsline = TimeSeries(df,x='Date', y='Close', ylabel=ssymbol+' Stock Prices', legend=True, color=color)
+    tsline = TimeSeries(df,x='Date', y='Close', ylabel=ssymbol+' Stock Prices', legend=True, color=colors[color])
     fig=vplot(tsline)
     # Configure resources to include BokehJS inline in the document.
     # For more details see:
@@ -98,8 +94,8 @@ def graphstocks(ssymbol):
         js_resources=js_resources,
         css_resources=css_resources,
         color=color,
-        _from=_from,
-        to=to,
+        _from=sdate,
+        to=edate,
         symbol_lulu=ssymbol
     )
     return encode_utf8(html)
@@ -108,18 +104,29 @@ def graphstocks(ssymbol):
 def butpush():
     if request.method =='GET':
         ssymbol="AAPL"
-        return(graphstocks(ssymbol))
+        edate = date.today().strftime("%Y-%m-%d")
+        sdate = date.today()-dateutil.relativedelta.relativedelta(months=1)
+        return(graphstocks(ssymbol,sdate,edate,"Black"))
     else:
         ssymbol=request.form['symbol_lulu']
-        return(graphstocks(ssymbol))
+        sdate = request.form['_from']
+        edate = request.form['to']
+        color = request.form['color']
+        try: 
+            sdate = parse(sdate).strftime("%Y-%m-%d")
+            edate = parse(edate).strftime("%Y-%m-%d")
+        except ValueError:
+            edate = date.today().strftime("%Y-%m-%d")
+            sdate = date.today()-dateutil.relativedelta.relativedelta(months=1)
+        return(graphstocks(ssymbol,sdate,edate,color))
 
 
 
 
 def main():
-    app.debug = True
-    app.run()
-    #app.run(port=33507)   #before putting on heroku, take away debug and use port 33507
+    #app.debug = True
+    #app.run()
+    app.run(port=33507)   #before putting on heroku, take away debug and use port 33507
     #print "HI""hi"
 
 if __name__ == "__main__":
